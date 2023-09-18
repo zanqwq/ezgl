@@ -44,3 +44,6 @@ You don’t have to ever use `eject`. The curated feature set is suitable for sm
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
+
+## NOTE
+If you are developing under WSL, you should create the project under WSL file system rather than windows or other original platform, otherwise hot module reload will not be able to recognize file change in other system.

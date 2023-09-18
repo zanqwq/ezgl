@@ -1,0 +1,1 @@
+export type ArrayOfLen<E, T extends number> = [E, ...E[]] & { length: T };
