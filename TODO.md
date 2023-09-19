@@ -13,10 +13,12 @@
 - [x] 整理代码, 封装 vs、fs template
 - [x] pane
 - [x] clinder, cone
-- [] view space light pos setting
-- [] shadow map, normal map, bump map, displacement map
-- [] shading frequency(flat, gouraud, phong shading)
-- [] point, line, wireframe
-- [] triangle mesh, read obj file
-- [] reflection model: blin-phong, lambert ...
-- [] 四元数
+- [x] view space light pos setting
+- [ ] shadow map, normal map, bump map, displacement map
+- [ ] shading frequency(flat, gouraud, phong shading)
+- [ ] point, line, wireframe
+- [ ] triangle mesh, read obj file
+- [ ] reflection model: blin-phong, lambert ...
+- [ ] 四元数
+- [ ] area light, spot light, hemisphere light
+- [ ] optimize performance

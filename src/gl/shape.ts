@@ -38,6 +38,7 @@ const fsTemplate = `
   precision highp float;
 #endif
 
+uniform mat4 uMatProjection;
 uniform vec3 ambientLights[NUM_AMB_LIGHTS > 0 ? NUM_AMB_LIGHTS : 1];
 uniform struct DirectionalLight {
   vec3 dir;
@@ -109,7 +110,9 @@ void main() {
     // 假设点光源在 r = 1 处能量为 I, 则总能量为 I * 4pi
     // 则在 r 处的能量为 I * 4pi / r^2 * 4pi
     // 即 I / r^2
-    vec3 lightPos = pointLights[i].pos;
+    vec4 t = uMatProjection * vec4(pointLights[i].pos, 1);
+    t /= t.w;
+    vec3 lightPos = vec3(t.x, t.y, t.z);
     vec3 lightColor = pointLights[i].color;
 
     float rSquare = pow(length(lightPos - vPos), 2.0);

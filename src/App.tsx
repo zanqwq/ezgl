@@ -79,7 +79,7 @@ function App() {
         deg += 1;
 
         const material = new Material();
-        material.color = [1, 0.8, 0.4];
+        material.color = [1, 1, 1];
         material.map = new Texture('/wood.jpg')
         material.materialType = MaterialType.COLOR;
         material.interactWithLight = true;
@@ -101,23 +101,23 @@ function App() {
           10
         ), material);
 
-        // 右面
+        // 左面
         const t = Transform.translate(-5, 0, -15).multi(Transform.rotateY(0.5 * Math.PI));
         const panePrimitive2 = new Primitive(new Pane(
           t,
           t.inverse(),
           10,
           10
-        ), material);
+        ), { ...material, color: [0, 1, 0] });
 
-        // 左面
+        // 右面
         const tt = Transform.translate(5, 0, -15).multi(Transform.rotateY(0.5 * Math.PI))
         const panePrimitive3 = new Primitive(new Pane(
           tt,
           tt.inverse(),
           10,
           10
-        ), material);
+        ), { ...material, color: [1, 0, 0] });
 
         // 下面
         const ttt = Transform.translate(0, -5, -15).multi(Transform.rotateX(0.5 * Math.PI))
@@ -182,7 +182,7 @@ function App() {
           // new DirectionalLight([1, 1, 0], [0.3, 0.1, 0.3]),
         ];
         scene.pointLights = [
-          new PointLight([1, 1, 1], [1, 1, 1]),
+          new PointLight([0, 3, -16], [1, 1, 1]),
           // new PointLight([-1, 0, 0], [1, 1, 1]),
         ];
 
@@ -191,7 +191,7 @@ function App() {
 
         render(canvasRef.current, scene, camera);
 
-        // requestAnimationFrame(testGL);
+        requestAnimationFrame(testGL);
       }
 
       testGL();
