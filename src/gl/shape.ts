@@ -1,139 +1,14 @@
-import { ArrayOfLen } from "../types";
 import { Vector } from "./geometry";
-import { DrawConfig } from "./renderer";
 import { Transform } from "./transform";
-
-const vsTemplate = `
-uniform mat4 uMatModelView;
-uniform mat4 uMatProjection;
-uniform mat4 uMatNormal;
-uniform vec3 uColor;
-
-attribute vec3 aPos;
-attribute vec3 aNor;
-attribute vec2 aTex;
-
-varying vec3 vPos;
-varying vec3 vNor;
-varying vec2 vTex;
-
-void main() {
-  gl_Position = uMatProjection * uMatModelView * vec4(aPos, 1);
-  gl_Position = gl_Position / gl_Position.w;
-
-  vPos = vec3(gl_Position.x, gl_Position.y, gl_Position.z);
-  // 注意, normalize 时 w 值也会影响 normalize, 所以应该用 vec3 做 normalize
-  vec4 t = uMatNormal * vec4(aNor, 0);
-  vNor = normalize(vec3(t.x, t.y, t.z));
-  vTex = aTex;
-}
-`;
-
-// 传 lights ? 设置 uniform int NUM_LIGHTS
-// 然后 Light lights[NUM_LIGHTS]
-// 不能 std::vector<Light>, 不能变长
-// TODO: 可以控制渲染为 normal, wireframe, texture, or phong
-const fsTemplate = `
-#ifdef GL_ES
-  precision highp float;
-#endif
-
-uniform mat4 uMatProjection;
-uniform vec3 ambientLights[NUM_AMB_LIGHTS > 0 ? NUM_AMB_LIGHTS : 1];
-uniform struct DirectionalLight {
-  vec3 dir;
-  vec3 color;
-} directionalLights[NUM_DIR_LIGHTS > 0 ? NUM_DIR_LIGHTS : 1];
-uniform struct PointLight {
-  vec3 pos;
-  vec3 color;
-} pointLights[NUM_POINT_LIGHTS > 0 ? NUM_POINT_LIGHTS : 1];
-
-uniform float uMaterialType;
-uniform float uInteractWithLight;
-uniform vec3 uColor;
-uniform vec3 uEyePos;
-uniform sampler2D uMap;
-
-varying vec3 vPos;
-varying vec3 vNor;
-varying vec2 vTex;
-
-void main() {
-  vec3 norColor = vec3(
-    (vNor.x + 1.0) / 2.0,
-    (vNor.y + 1.0) / 2.0,
-    (vNor.z + 1.0) / 2.0
-  );
-  vec4 t = texture2D(uMap, vTex);
-  vec3 texColor = vec3(t.x, t.y, t.z);
-
-  vec3 kd;
-  if (uMaterialType == 0.0) {
-    kd = norColor;
-  } else if (uMaterialType == 1.0) {
-    kd = texColor;
-  } else if (uMaterialType == 2.0) {
-    kd = uColor;
-  }
-
-
-  if (uInteractWithLight == 0.0) {
-    gl_FragColor = vec4(kd, 1);
-    return;
-  }
-
-  // 计算 pling-phong 反射模型 ambient + diffuse + specular
-  vec3 color = vec3(0, 0, 0);
-
-  vec3 ka = vec3(0.1, 0.05, 0.1);
-  for (int i = 0; i < NUM_AMB_LIGHTS; i++) {
-    color += ka * ambientLights[i];
-  }
-
-  vec3 eye_dir = normalize(uEyePos - vPos);
-  vec3 ks = vec3(0.5, 0.5, 0.5);
-  // 控制高光大小(值越大, pow 值越小, 高光越小)
-  float p = 10.0;
-  for (int i = 0; i < NUM_DIR_LIGHTS; i++) {
-    vec3 light_intensity = directionalLights[i].color;
-    vec3 light_dir = -normalize(directionalLights[i].dir);
-
-    vec3 diffuse = kd * light_intensity * max(dot(vNor, light_dir), 0.0);
-    vec3 specular = ks * light_intensity * pow(max(0.0, dot(vNor, normalize(light_dir + eye_dir))), p);
-
-    color += diffuse + specular;
-  }
-
-  for (int i = 0; i < NUM_POINT_LIGHTS; i++) {
-    // 球的表面积 A = 4*pi*r^2
-    // 假设点光源在 r = 1 处能量为 I, 则总能量为 I * 4pi
-    // 则在 r 处的能量为 I * 4pi / r^2 * 4pi
-    // 即 I / r^2
-    vec4 t = uMatProjection * vec4(pointLights[i].pos, 1);
-    t /= t.w;
-    vec3 lightPos = vec3(t.x, t.y, t.z);
-    vec3 lightColor = pointLights[i].color;
-
-    float rSquare = pow(length(lightPos - vPos), 2.0);
-    vec3 light_intensity = lightColor / (rSquare < 1.0 ? 1.0 : rSquare);
-    light_intensity = lightColor;
-    vec3 light_dir = normalize(lightPos - vPos);
-
-    vec3 diffuse = kd * light_intensity * max(dot(vNor, light_dir), 0.0);
-    vec3 specular = ks * light_intensity * pow(max(0.0, dot(vNor, normalize(light_dir + eye_dir))), p);
-
-    color += diffuse + specular;
-  }
-
-  gl_FragColor = vec4(color, 1);
-}
-`;
 
 export class Shape {
   obj2world: Transform
   world2Obj: Transform
-  drawCfg: DrawConfig | undefined;
+  // drawCfg: DrawConfig | undefined;
+  positions: number[][] = [];
+  texCoors: number[][] = [];
+  normals: number[][] = [];
+  indices: number[][] = [];
 
   // getBounding
   // getArea
@@ -163,7 +38,7 @@ export class Cube extends Shape {
     const f = c / 2;
 
     // 按 xyz 的顺序来
-    const aPos = [
+    const positions = [
       // 右左(r取反)
       [r, t, -f],
       [r, t, f],
@@ -194,8 +69,9 @@ export class Cube extends Shape {
       [-r, -t, -f],
       [r, -t, -f],
     ];
+    this.positions = positions;
 
-    const aNor = [
+    const normals = [
       ...new Array(4).fill([1, 0, 0]),
       ...new Array(4).fill([-1, 0, 0]),
       ...new Array(4).fill([0, 1, 0]),
@@ -203,50 +79,42 @@ export class Cube extends Shape {
       ...new Array(4).fill([0, 0, 1]),
       ...new Array(4).fill([0, 0, -1]),
     ];
+    this.normals = normals;
 
-    const aTex: number[][] = [];
+    const texCoors: number[][] = [];
     for (let i = 0; i < 6; i++) {
-      aTex.push([1, 1], [1, 0], [0, 0], [0, 1]);
+      texCoors.push([1, 1], [0, 1], [0, 0], [1, 0]);
     }
+    this.texCoors = texCoors;
 
-    this.drawCfg = {
-      drawVertexCnt: 6 * 6,
-      drawMethod: WebGLRenderingContext.TRIANGLES,
-      drawVertexIndexes: [
-        // 右
-        [0, 1, 2],
-        [0, 2, 3],
-        // 左
-        [4, 5, 6],
-        [4, 6, 7],
-        // 上
-        [8, 9, 10],
-        [8, 10, 11],
-        // 下
-        [12, 13, 14],
-        [12, 14, 15],
-        // 前
-        [16, 17, 18],
-        [16, 18, 19],
-        // 后
-        [20, 21, 22],
-        [20, 22, 23],
-      ],
-      vs: {
-        source: vsTemplate,
-        arrtris: { aPos, aNor, aTex },
-      },
-      fs: { source: fsTemplate },
-    }
+    const indices = [
+      // 右
+      [0, 1, 2],
+      [0, 2, 3],
+      // 左
+      [4, 5, 6],
+      [4, 6, 7],
+      // 上
+      [8, 9, 10],
+      [8, 10, 11],
+      // 下
+      [12, 13, 14],
+      [12, 14, 15],
+      // 前
+      [16, 17, 18],
+      [16, 18, 19],
+      // 后
+      [20, 21, 22],
+      [20, 22, 23],
+    ];
+    this.indices = indices;
   }
 }
 
 // pane 不能完全薄, 不然法线不好处理
-export class Pane extends Shape {
+export class Pane extends Cube {
   constructor(o2w: Transform, w2o: Transform, w: number, h: number) {
-    super(o2w, w2o);
-    // 处理成很薄的 cube
-    this.drawCfg = new Cube(o2w, w2o, w, h, 0.1).drawCfg;
+    super(o2w, w2o, w, h, 0.1);
   }
 }
 
@@ -280,9 +148,9 @@ export class Sphere extends Shape {
       ...
     ]
     */
-    const aPos: number[][] = [];
-    const aNor: number[][] = [];
-    const aTex: number[][] = [];
+    const positions: number[][] = [];
+    const normals: number[][] = [];
+    const texCoors: number[][] = [];
 
     for (let i = 0; i <= hSeg; i++) {
       const v = i / hSeg;
@@ -295,12 +163,12 @@ export class Sphere extends Shape {
         const x = e * Math.cos(phi);
         const z = -e * Math.sin(phi);
 
-        aPos.push([x, y, z]);
+        positions.push([x, y, z]);
 
         const norVec = new Vector(x, y, z).normalized();
-        aNor.push([norVec.x, norVec.y, norVec.z]);
+        normals.push([norVec.x, norVec.y, norVec.z]);
 
-        aTex.push([u, v]);
+        texCoors.push([u, v]);
       }
     }
     const indices: number[][] = [];
@@ -318,16 +186,10 @@ export class Sphere extends Shape {
       }
     }
 
-    this.drawCfg = {
-      drawMethod: WebGLRenderingContext.TRIANGLES,
-      drawVertexCnt: indices.flat().length,
-      drawVertexIndexes: indices,
-      vs: {
-        source: vsTemplate,
-        arrtris: { aPos, aNor, aTex },
-      },
-      fs: { source: fsTemplate }
-    }
+    this.positions = positions;
+    this.normals = normals;
+    this.texCoors = texCoors;
+    this.indices = indices;
   }
 }
 
@@ -363,13 +225,10 @@ export class Cone extends Shape {
       indices.push([topIdx, len, len - 1]);
     }
 
-    this.drawCfg = {
-      drawMethod: WebGLRenderingContext.TRIANGLES,
-      drawVertexCnt: indices.flat().length,
-      drawVertexIndexes: indices,
-      vs: { source: vsTemplate, arrtris: { aPos, aNor } },
-      fs: { source: fsTemplate },
-    }
+    this.positions = aPos;
+    this.normals = aNor;
+    this.texCoors = aTex;
+    this.indices = indices;
   }
 }
 
@@ -378,32 +237,32 @@ export class Clinder extends Shape {
     super(o2w, w2o);
     // 同样跟 cone 一样, 同一个 vertex 在不同情况下渲染时, 它的 normal 朝向不同 
     // 所以分三个部分画, 上面, 侧面, 下面
-    const aPos: number[][] = [];
-    const aNor: number[][] = [];
-    const aTex: number[][] = [];
+    const positions: number[][] = [];
+    const normals: number[][] = [];
+    const texCoors: number[][] = [];
     const indices: number[][] = [];
 
     // 上面
-    aPos.push([0, h / 2, 0]);
-    aNor.push([0, 1, 0]);
+    positions.push([0, h / 2, 0]);
+    normals.push([0, 1, 0]);
     for (let i = 0; i <= seg; i++) {
       const radian = 2 * Math.PI * i / seg;
-      const len = aPos.length;
-      aPos.push([radius * Math.cos(radian), h / 2, -radius * Math.sin(radian)]);
-      aNor.push([0, 1, 0]);
+      const len = positions.length;
+      positions.push([radius * Math.cos(radian), h / 2, -radius * Math.sin(radian)]);
+      normals.push([0, 1, 0]);
       if (i === 0) continue;
       indices.push([0, len, len - 1])
     }
 
     // 下面
-    const bottomIdx = aPos.length;
-    aPos.push([0, -h / 2, 0]);
-    aNor.push([0, -1, 0]);
+    const bottomIdx = positions.length;
+    positions.push([0, -h / 2, 0]);
+    normals.push([0, -1, 0]);
     for (let i = 0; i <= seg; i++) {
       const radian = 2 * Math.PI * i / seg;
-      const len = aPos.length;
-      aPos.push([radius * Math.cos(radian), -h / 2, -radius * Math.sin(radian)]);
-      aNor.push([0, -1, 0]);
+      const len = positions.length;
+      positions.push([radius * Math.cos(radian), -h / 2, -radius * Math.sin(radian)]);
+      normals.push([0, -1, 0]);
       if (i === 0) continue;
       indices.push([bottomIdx, len, len - 1]);
     }
@@ -413,38 +272,31 @@ export class Clinder extends Shape {
       const radian = 2 * Math.PI * i / seg;
       const dx = radius * Math.cos(radian);
       const dz = -radius * Math.sin(radian);
-      aPos.push([dx, h / 2, dz], [dx, -h / 2, dz]);
+      positions.push([dx, h / 2, dz], [dx, -h / 2, dz]);
       const nor = [Math.cos(radian), 0, -Math.sin(radian)];
-      aNor.push(nor, nor);
+      normals.push(nor, nor);
       if (i === 0) continue;
       /*
       1 -- 3
       |  / |
-      |/  |
-      2 - 4
+      | /  |
+      2 -- 4
       */
-      const idx = aPos.length - 1;
+      const idx = positions.length - 1;
       // (4 3 2), (3, 2, 1)
       indices.push([idx, idx - 1, idx - 2], [idx - 1, idx - 2, idx - 3]);
     }
 
-    this.drawCfg = {
-      drawMethod: WebGLRenderingContext.TRIANGLES,
-      drawVertexCnt: indices.flat().length,
-      drawVertexIndexes: indices,
-      vs: {
-        source: vsTemplate,
-        arrtris: { aPos, aNor },
-      },
-      fs: { source: fsTemplate },
-    }
+    this.positions = positions;
+    this.normals = normals;
+    this.texCoors = texCoors;
+    this.indices = indices;
   }
 }
 
 // 同样处理成很矮的 clinder
-export class Circle extends Shape {
+export class Circle extends Clinder {
   constructor(o2w: Transform, w2o: Transform, radius: number, segments = 32) {
-    super(o2w, w2o);
-    this.drawCfg = new Clinder(o2w, w2o, radius, 0.1, segments).drawCfg
+    super(o2w, w2o, radius, 0.1, segments);
   }
 }

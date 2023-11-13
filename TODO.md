@@ -15,6 +15,8 @@
 - [x] clinder, cone
 - [x] view space light pos setting
 - [ ] shadow map, normal map, bump map, displacement map
+- [ ] 把 vs, fs 写进 material 里, 比如, phong material, glass material ...
+- [ ] look at z rather than -z
 - [ ] shading frequency(flat, gouraud, phong shading)
 - [ ] point, line, wireframe
 - [ ] triangle mesh, read obj file

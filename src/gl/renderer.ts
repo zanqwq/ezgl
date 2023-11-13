@@ -1,24 +1,25 @@
 import { Camera } from "./camera";
 import { Primitive } from "./primitive";
 import { Scene } from "./scene";
-import { cloneDeep } from 'lodash';
 import { Transform } from "./transform";
-import { Point } from "./geometry";
+import { Matrix4x4, Point } from "./geometry";
+import { Texture } from "./texture";
+import { FBO } from "./FBO";
+import { DirLightShadowMaterial } from "./material";
+import { Cube, Pane } from "./shape";
 
 export type DrawConfig = {
   // uniform is available for both vs and fs
   // while attribute is only available for vs
   // and varying can be declare in vs and pass to fs
   uniforms?: Record<string, number | number[] | Array<number[]>>;
-  textures?: Record<string, string>;
-  vedioTextures?: Record<string, string>;
-  vs: { source: string; arrtris?: Record<string, Array<number[]>> };
+  textures?: Record<string, Texture>;
+  vs: { source: string; attributes?: Record<string, Array<number[]>> };
   fs: { source: string; }
   drawVertexIndexes?: Array<number[]>;
   drawMethod: number;
   drawVertexCnt: number;
-  // 面, 点(gouraud shading), 像素(phong shading)
-  shadingFrequency?: 'flat' | 'vertex' | 'pixel';
+  fbo?: FBO;
 };
 
 const checkIsPowerOf2 = (x: number) => {
@@ -42,7 +43,16 @@ export function draw(canvas: HTMLCanvasElement, cfg: DrawConfig) {
   const gl = canvas.getContext("webgl");
   if (!gl) return;
 
-  const { vs, fs, drawVertexIndexes, drawMethod, drawVertexCnt } = cfg;
+  const { vs, fs, drawVertexIndexes, drawMethod, drawVertexCnt, fbo } = cfg;
+
+  if (fbo?.frameBuffer) {
+    console.log('fb', fbo.frameBuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.frameBuffer);
+    gl.viewport(0, 0, 2048, 2048);
+  } else {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
 
   const program = gl.createProgram();
   if (!program) return;
@@ -70,7 +80,8 @@ export function draw(canvas: HTMLCanvasElement, cfg: DrawConfig) {
   }
   gl.useProgram(program);
 
-  for (const [name, value] of Object.entries(vs.arrtris || {})) {
+  for (const [name, value] of Object.entries(vs.attributes || {})) {
+    if (value[0] === undefined) continue;
     // create buffer, bind buffer data and assign data to attributes and uniforms
     const buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -98,98 +109,81 @@ export function draw(canvas: HTMLCanvasElement, cfg: DrawConfig) {
   }
 
   const { textures } = cfg;
-  for (const [name, url] of Object.entries(textures || {})) {
-    const image = new Image();
-    image.onload = () => {
-      gl.activeTexture(gl.TEXTURE0);
-      const texture = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-
-      const level = 0;
-      const internalFormat = gl.RGBA;
-      const srcFormat = gl.RGBA;
-      const srcType = gl.UNSIGNED_BYTE;
-
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        level,
-        internalFormat,
-        srcFormat,
-        srcType,
-        image
-      );
-
-      if (checkIsPowerOf2(image.width) && checkIsPowerOf2(image.height)) {
-        gl.generateMipmap(gl.TEXTURE_2D);
-      } else {
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      }
-
-      gl.uniform1i(location, 0);
-    };
-    image.src = url;
-
+  Object.entries(textures || {}).forEach(([name, tex], i) => {
     const location = gl.getUniformLocation(program, name);
-      // Tell WebGL we want to affect texture unit 0
-    gl.activeTexture(gl.TEXTURE0);
+    // Tell the shader we bound the texture to i
+    gl.uniform1i(location, i);
 
-    // Bind the texture to texture unit 0
-    // ctx.bindTexture(ctx.TEXTURE_2D, texture);
+    const texture = gl.createTexture();
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const format = gl.RGBA;
+    const type = gl.UNSIGNED_BYTE;
 
-    // Tell the shader we bound the texture to texture unit 0
-    gl.uniform1i(location, 0);
+    const texUnit = gl.TEXTURE0 + i;
+    if (tex.url) {
+      if (tex.url.endsWith('mp4')) {
+        const vedio = document.createElement('video');
+        vedio.playsInline = true;
+        vedio.muted = true;
+        vedio.loop = true;
 
-    // gl.activeTexture(gl.TEXTURE30);
-    // gl.bindTexture(gl.TEXTURE_2D, texture);
-    // bind to texture unit 0
-    // gl.uniform1i(location, 0);
-  }
+        let playing = false;
+        let timeupdate = false;
 
-  const { vedioTextures } = cfg;
-  for (const [name, url] of Object.entries(vedioTextures || {})) {
-    const vedio = document.createElement('video');
-    
-    vedio.playsInline = true;
-    vedio.muted = true;
-    vedio.loop = true;
+        vedio.addEventListener('playing', () => {
+          playing = true;
+        }, true);
+        vedio.addEventListener('timeupdate', () => {
+          timeupdate = true;
+        }, true)
 
-    let playing = false;
-    let timeupdate = false;
+        vedio.src = tex.url;
+        vedio.play();
 
-    vedio.addEventListener('playing', () => {
-      playing = true;
-    }, true);
-    vedio.addEventListener('timeupdate', () => {
-      timeupdate = true;
-    }, true)
+        const timer = setInterval(() => {
+          if (!playing || !timeupdate) return;
+          // Tell WebGL we want to affect texture unit
+          gl.activeTexture(texUnit);
+          gl.bindTexture(gl.TEXTURE_2D, texture)
+          gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, format, type, vedio)
+          // Turn off mips and set wrapping to clamp to edge so it
+          // will work regardless of the dimensions of the video.
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
-    vedio.src = url;
-    vedio.play();
-
-    const timer = setInterval(() => {
-      if (playing && timeupdate) {
-
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture)
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, vedio)
-        gl.activeTexture(gl.TEXTURE0)
-        gl.uniform1i(gl.getUniformLocation(program, name), 0)
-        // Turn off mips and set wrapping to clamp to edge so it
-        // will work regardless of the dimensions of the video.
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-        clearTimeout(timer);
+          clearTimeout(timer);
+        });
+      } else {
+        const image = new Image();
+        image.onload = () => {
+          // Tell WebGL we want to affect texture unit
+          gl.activeTexture(texUnit);
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, format, type, image);
+          if (checkIsPowerOf2(image.width) && checkIsPowerOf2(image.height)) {
+            gl.generateMipmap(gl.TEXTURE_2D);
+          } else {
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          }
+        };
+        image.src = tex.url;
       }
-    });
-  }
+    } else if (tex.fbo) {
+      gl.activeTexture(texUnit);
+      gl.bindTexture(gl.TEXTURE_2D, tex.fbo.texture);
+    } else if (tex.color) {
+      gl.activeTexture(texUnit);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, 1, 1, 0, format, type, new Uint8Array(tex.color.map(c => c * 255)))
+    }
+  });
 
   if (drawVertexIndexes) {
     const buffer = gl.createBuffer();
-    if (!buffer) return;
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(drawVertexIndexes.flat()), gl.STATIC_DRAW);
     gl.drawElements(drawMethod, drawVertexCnt, gl.UNSIGNED_SHORT, 0);
@@ -198,93 +192,25 @@ export function draw(canvas: HTMLCanvasElement, cfg: DrawConfig) {
   gl.drawArrays(drawMethod, 0, drawVertexCnt);
 }
 
-// think: 怎么对单个物体进行 transform ?
-// render (scene, camera), for each object, set uniform modelView and render it
-export function renderPrimitive(canvas: HTMLCanvasElement, primitive: Primitive, scene: Scene, camera: Camera) {
-  /*
-  (local space) -> model -> (world space) -> view -> (view space) -> projection -> (clip space)
-  NOTE: 需要 transpose 一下, 因为 glsl 里 mat 按列声明, 例如
-
-  mat4 m(
-    1, 0, 0, 0, // col0
-    0, 1, 0, 0, // col1
-    0, 0, 1, 0, // col2
-    0, 0, 0, 1 // col3
-  );
-  */
-
-  // TODO: error mInv
-  const modelViewTransform = camera.viewTranform.multi(primitive.shape.obj2world);
-  const uMatModelView = modelViewTransform.transpose().m.m;
-
-  const clipTransform = camera.clipTransform;
-  const uMatProjection = clipTransform.transpose().m.m;
-
-  // 法线不用经过 clipTransform
-  const transform = modelViewTransform;
-  const uMatNormal = Transform.normalTransform(transform).transpose().m.m;
-
-  const orthoTransform = camera.orthoTransform;
-  const eyePosPoint = orthoTransform.transformPoint(new Point(0, 0, 0));
-  const uEyePos = [eyePosPoint.x, eyePosPoint.y, eyePosPoint.z];
-
-  const uniformCfgs: DrawConfig['uniforms'] = { uMatModelView, uMatProjection, uMatNormal, uEyePos };
-
-  const drawCfg = cloneDeep(primitive.shape.drawCfg);
-  if (drawCfg === undefined) return;
-  drawCfg.uniforms = { ...uniformCfgs, ...(drawCfg.uniforms || {}) };
-
-  if (primitive.material?.map?.url) {
-    const texType: keyof DrawConfig = primitive.material.map.isVedio ? 'vedioTextures' : 'textures';
-      drawCfg[texType] = { ...(drawCfg![texType] || {}), uMap: primitive.material.map.url }
-  }
-
-  drawCfg.uniforms['uColor'] = primitive.material?.color || [1, 1, 1];
-  drawCfg.uniforms['uInteractWithLight'] = primitive.material?.interactWithLight ? 1 : 0;
-  drawCfg.uniforms['uMaterialType'] = primitive.material?.materialType || 0;
-
-  const { ambientLights, directionalLights, pointLights } = scene;
-
-  const NUM_AMB = 'NUM_AMB_LIGHTS';
-  const numAmbs = ambientLights.length;
-  drawCfg.uniforms![NUM_AMB] = numAmbs;
-  ambientLights.forEach((light, idx) => {
-    drawCfg.uniforms![`ambientLights[${idx}]`] = light;
-  });
-
-  const NUM_DIR = 'NUM_DIR_LIGHTS';
-  const numDirs = directionalLights.length;
-  drawCfg.uniforms![NUM_DIR] = numDirs;
-  directionalLights.forEach((light, idx) => {
-    const { dir, color } = light;
-    drawCfg.uniforms![`directionalLights[${idx}].dir`] = dir;
-    drawCfg.uniforms![`directionalLights[${idx}].color`] = color;
-  });
-
-  const NUM_POINT = 'NUM_POINT_LIGHTS';
-  const numPoints = pointLights.length;
-  drawCfg.uniforms![NUM_POINT] = numPoints;
-  pointLights.forEach((light, idx) => {
-    const { pos, color } = light;
-    drawCfg.uniforms![`pointLights[${idx}].pos`] = pos;
-    drawCfg.uniforms![`pointLights[${idx}].color`] = color;
-  });
-
-  const replaceSymbol = (name: string, value: string) => {
-    drawCfg.vs.source = drawCfg.vs.source.replaceAll(name, value);
-    drawCfg.fs.source = drawCfg.fs.source.replaceAll(name, value);
-  };
-  
-  replaceSymbol(NUM_AMB, String(numAmbs));
-  replaceSymbol(NUM_DIR, String(numDirs));
-  replaceSymbol(NUM_POINT, String(numPoints));
-
-  draw(canvas, drawCfg);
-}
-
 export function render(canvas: HTMLCanvasElement, scene: Scene, camera: Camera) {
   init(canvas);
+  // for each light, create frameBuffer
+  //  for each primitive, render the depth graph
+  for (const light of scene.directionalLights) {
+    light.setFBO(canvas);
+    for (const primitive of scene.primitives) {
+      const dirLightShadowMaterial = new DirLightShadowMaterial();
+      const cfg = dirLightShadowMaterial.compile(primitive.shape, light);
+      draw(canvas, cfg);
+    }
+  }
+
+  // frame buffer object: consist of color attachment(texture), depth attachment + stencil attachment(render buffer)
   for (const primitive of scene.primitives) {
-    renderPrimitive(canvas, primitive, scene, camera);
+    if (primitive.shape instanceof Cube && !(primitive.shape instanceof Pane)) continue;
+    // renderPrimitive(canvas, primitive, scene, camera);
+    const cfg = primitive.material.compile(primitive.shape, scene, camera);
+    console.log('draw', cfg);
+    draw(canvas, cfg);
   }
 }

@@ -213,6 +213,27 @@ export class Transform {
     return rotateAxis.multi(translate);
   }
 
+  static orthoTransform(r: number, l: number, t: number, b: number, n: number, f: number) {
+    return Transform.scale(2 / (r - l), 2 / (t - b), 2 / (n - f))
+      .multi(Transform.translate(-(r + l) / 2, -(t + b) / 2, -(n + f) / 2));
+  }
+
+  static perspectTranform(fovY: number, aspectRatio: number, zNear: number, zFar: number) {
+    const n = zNear, f = zFar;
+    const t = Math.abs(Math.tan(fovY / 2) * n), b = -t;
+    const r = t / aspectRatio, l = -r;
+
+    const matPersp2Ortho = new Matrix4x4([
+      [n, 0, 0, 0],
+      [0, n, 0, 0],
+      [0, 0, n + f, -n * f],
+      [0, 0, 1, 0],
+    ]);
+    const persp2orthoTransform = new Transform(matPersp2Ortho)
+
+    return Transform.orthoTransform(r, l, t, b, n, f).multi(persp2orthoTransform);
+  }
+
   transformPoint(p: Point) {
     const x = this.m.m[0][0] * p.x + this.m.m[0][1] * p.y + this.m.m[0][2] * p.z + this.m.m[0][3];
     const y = this.m.m[1][0] * p.x + this.m.m[1][1] * p.y + this.m.m[1][2] * p.z + this.m.m[1][3];
