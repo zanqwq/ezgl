@@ -15,13 +15,15 @@ export class PointLight {
 
 export class DirectionalLight {
   pos: number[];
-  dir: number[] 
+  dir: number[];
+  up: number[];
   color: number[];
   fbo: FBO | undefined;
 
-  constructor(pos: number[], dir: number[], color: number[]) {
+  constructor(pos: number[], dir: number[], up: number[], color: number[]) {
     this.pos = pos;
     this.dir = dir;
+    this.up = up;
     this.color = color;
   }
 
@@ -31,9 +33,12 @@ export class DirectionalLight {
     const p = new Point(this.pos[0], this.pos[1], this.pos[2]);
     const view = Transform.lookAt(
       p,
-      p.add(new Point(this.dir[0], this.dir[1], this.dir[2])),
-      // TODO:
-      new Vector(0, 1, 0)
+      p.add(new Point(
+        this.pos[0] + this.dir[0],
+        this.pos[1] + this.dir[1],
+        this.pos[2] + this.dir[2]
+      )),
+      new Vector(this.up[0], this.up[1], this.up[2])
     );
 
     const projection = Transform.orthoTransform(5, -5, 5, -5, -5, -1000);

@@ -46,7 +46,6 @@ export function draw(canvas: HTMLCanvasElement, cfg: DrawConfig) {
   const { vs, fs, drawVertexIndexes, drawMethod, drawVertexCnt, fbo } = cfg;
 
   if (fbo?.frameBuffer) {
-    console.log('fb', fbo.frameBuffer);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo.frameBuffer);
     gl.viewport(0, 0, 2048, 2048);
   } else {
@@ -207,10 +206,7 @@ export function render(canvas: HTMLCanvasElement, scene: Scene, camera: Camera) 
 
   // frame buffer object: consist of color attachment(texture), depth attachment + stencil attachment(render buffer)
   for (const primitive of scene.primitives) {
-    if (primitive.shape instanceof Cube && !(primitive.shape instanceof Pane)) continue;
-    // renderPrimitive(canvas, primitive, scene, camera);
     const cfg = primitive.material.compile(primitive.shape, scene, camera);
-    console.log('draw', cfg);
     draw(canvas, cfg);
   }
 }

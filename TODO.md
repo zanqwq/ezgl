@@ -14,13 +14,14 @@
 - [x] pane
 - [x] clinder, cone
 - [x] view space light pos setting
-- [ ] shadow map, normal map, bump map, displacement map
-- [ ] 把 vs, fs 写进 material 里, 比如, phong material, glass material ...
+- [x] 把 vs, fs 写进 material 里, 比如, phong material, glass material ...
 - [ ] look at z rather than -z
+- [ ] shadow map, normal map
+- [ ] optimize performance, 复用 buffer
+- [ ] area light, spot light, hemisphere light
 - [ ] shading frequency(flat, gouraud, phong shading)
+- [ ] bump map, displacement map
 - [ ] point, line, wireframe
 - [ ] triangle mesh, read obj file
 - [ ] reflection model: blin-phong, lambert ...
 - [ ] 四元数
-- [ ] area light, spot light, hemisphere light
-- [ ] optimize performance
