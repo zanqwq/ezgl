@@ -179,7 +179,7 @@ function App() {
           // [1, 1, 1],
         ];
         scene.directionalLights = [
-          new DirectionalLight([0, 0, 0], [0, 0, -1], [1, 1, 1]),
+          new DirectionalLight([0, 0, 0], [0, 0, -1], [0, 1, 0], [1, 1, 1]),
           // new DirectionalLight([1, 1, 0], [0.3, 0.1, 0.3]),
         ];
         scene.pointLights = [
