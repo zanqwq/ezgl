@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useLayoutEffect } from 'react';
 import logo from './logo.svg';
 import './App.css';
 import { render } from './gl/renderer';
@@ -70,105 +70,105 @@ function App() {
     }
 
     function test3d() {
-      let deg = 0;
       function testGL() {
         if (!canvasRef.current) return;
         const scene = new Scene();
 
-        const obj2world = Transform.translate(0, 0, -15).multi(Transform.rotateX((deg / 180) * Math.PI));
-        deg += 1;
-
         const material = new PhongMaterial();
+        // material.map.color = [1, 1, 0, 1];
         // material.map.url = '/wood.jpg'
+        const cubeTransform = Transform.translate(0, -10, -30);
         const cubePrimitive = new Primitive(
           new Cube(
-            obj2world,
-            obj2world.inverse(),
-            5, 5, 5,
+            cubeTransform,
+            cubeTransform.inverse(),
+            30, 30, 30
           ),
           material 
         );
 
-        // 后面
-        const backPanePrimitive = new Primitive(new Pane(
-          Transform.translate(0, 0, -50),
-          Transform.translate(0, 0, 50),
-          20,
-          20
+        // // 后面
+        // const backPanePrimitive = new Primitive(new Pane(
+        //   Transform.translate(0, 0, -50),
+        //   Transform.translate(0, 0, 50),
+        //   20,
+        //   20
+        // ), material);
+
+        // // 左面
+        // const t = Transform.translate(-5, 0, -15).multi(Transform.rotateY(0.5 * Math.PI));
+        // const leftPaneMaterial = new PhongMaterial();
+        // leftPaneMaterial.map.color = [0, 1, 0, 1];
+        // const leftPanePrimitive = new Primitive(new Pane(
+        //   t,
+        //   t.inverse(),
+        //   10,
+        //   10
+        // ), leftPaneMaterial);
+
+        // // 右面
+        // const tt = Transform.translate(5, 0, -15).multi(Transform.rotateY(0.5 * Math.PI));
+        // const rightPaneMaterial = new PhongMaterial();
+        // rightPaneMaterial.map.color = [1, 0, 0, 1];
+        // const rightPanePrimitive = new Primitive(new Pane(
+        //   tt,
+        //   tt.inverse(),
+        //   10,
+        //   10
+        // ), rightPaneMaterial);
+
+        // // 下面
+        const btmPaneTransform = Transform.translate(0, -15, -30).multi(Transform.rotateX(0.5 * Math.PI));
+        const bottomPanePrimitive = new Primitive(new Pane(
+          btmPaneTransform,
+          btmPaneTransform.inverse(),
+          80, 40,
         ), material);
 
-        // 左面
-        const t = Transform.translate(-5, 0, -15).multi(Transform.rotateY(0.5 * Math.PI));
-        const leftPaneMaterial = new PhongMaterial();
-        leftPaneMaterial.map.color = [0, 1, 0, 1];
-        const leftPanePrimitive = new Primitive(new Pane(
-          t,
-          t.inverse(),
-          10,
-          10
-        ), leftPaneMaterial);
+        // // 上面
+        // const tttt = Transform.translate(0, 5, -15).multi(Transform.rotateX(0.5 * Math.PI));
+        // const topPanePrimitive5 = new Primitive(new Pane(
+        //   tttt,
+        //   tttt.inverse(),
+        //   10,
+        //   10
+        // ), material);
 
-        // 右面
-        const tt = Transform.translate(5, 0, -15).multi(Transform.rotateY(0.5 * Math.PI));
-        const rightPaneMaterial = new PhongMaterial();
-        rightPaneMaterial.map.color = [1, 0, 0, 1];
-        const rightPanePrimitive = new Primitive(new Pane(
-          tt,
-          tt.inverse(),
-          10,
-          10
-        ), rightPaneMaterial);
+        // const sphereMaterial = new PhongMaterial();
+        // // sphereMaterial.map.color = [0, 0, 1, 1];
+        // // sphereMaterial.map.url = '/wood.jpg';
+        // const spherePrimitive = new Primitive(
+        //   new Sphere(
+        //     Transform.translate(0, 0, -15),
+        //     Transform.translate(0, 0, 15),
+        //     3
+        //   ),
+        //   sphereMaterial,
+        // );
 
-        // 下面
-        const ttt = Transform.translate(0, -5, -15).multi(Transform.rotateX(0.5 * Math.PI))
-        const bottomPanePrimitive4 = new Primitive(new Pane(
-          ttt,
-          ttt.inverse(),
-          10,
-          10
-        ), material);
+        // const conePrimitive = new Primitive(
+        //   new Cone(obj2world, obj2world.inverse(), 5, 10),
+        //   material,
+        // );
 
-        // 上面
-        const tttt = Transform.translate(0, 5, -15).multi(Transform.rotateX(0.5 * Math.PI));
-        const topPanePrimitive5 = new Primitive(new Pane(
-          tttt,
-          tttt.inverse(),
-          10,
-          10
-        ), material);
+        // const clinderPrimitive = new Primitive(
+        //   new Clinder(obj2world, obj2world.inverse(), 5, 10),
+        //   material,
+        // );
 
-        const sphereMaterial = new PhongMaterial();
-        // sphereMaterial.map.color = [0, 0, 1, 1];
-        // sphereMaterial.map.url = '/wood.jpg';
-        const spherePrimitive = new Primitive(
-          new Sphere(
-            obj2world,
-            obj2world.inverse(),
-            3
-          ),
-          sphereMaterial,
-        );
-
-        const conePrimitive = new Primitive(
-          new Cone(obj2world, obj2world.inverse(), 5, 10),
-          material,
-        );
-
-        const clinderPrimitive = new Primitive(
-          new Clinder(obj2world, obj2world.inverse(), 5, 10),
-          material,
-        );
-
-        const circlePrimitive = new Primitive(new Circle(
-          obj2world,
-          obj2world.inverse(),
-          2,
-        ), material);
+        // const circlePrimitive = new Primitive(new Circle(
+        //   obj2world,
+        //   obj2world.inverse(),
+        //   2,
+        // ), material);
 
         scene.primitives = [
-          backPanePrimitive,
           cubePrimitive,
-          // leftPanePrimitive, rightPanePrimitive, bottomPanePrimitive4, topPanePrimitive5,
+          bottomPanePrimitive,
+          // backPanePrimitive,
+          // leftPanePrimitive,
+          // rightPanePrimitive,
+          // topPanePrimitive5,
           // spherePrimitive
           // conePrimitive,
           // clinderPrimitive,
@@ -179,20 +179,28 @@ function App() {
           // [1, 1, 1],
         ];
         scene.directionalLights = [
-          new DirectionalLight([0, 0, 0], [0, 0, -1], [0, 1, 0], [1, 1, 1]),
-          // new DirectionalLight([1, 1, 0], [0.3, 0.1, 0.3]),
+          new DirectionalLight([0, 100, -30], [0, -1, 0], [0, 0, -1], [1, 1, 1]),
         ];
         scene.pointLights = [
-          // new PointLight([0, 4, -13], [1, 1, 1]),
+          // new PointLight([0, 0, -14], [1, 1, 1]),
           // new PointLight([-1, 0, 0], [1, 1, 1]),
         ];
 
-        const camera = new Camera(Math.PI / 2, 1, -5, -1000);
-        camera.lookAt(new Point(10, 0, 0), new Point(0, 0, -15), new Vector(0, 1, 0));
+        const camera = new Camera(90 * Math.PI / 180, 1, -1, -1000);
+        // camera.lookAt(new Point(0, 100, -30), new Point(0, 0, -30), new Vector(0, 0, -1));
+        camera.lookAt(new Point(0, 0, 30), new Point(0, 0, -30), new Vector(0, 1, 0));
+        // camera.lookAt(new Point(0, 30, 0), new Point(0, 0, -30), new Vector(0, 1, -1));
 
-        render(canvasRef.current, scene, camera);
-
-        // requestAnimationFrame(testGL);
+        let deg = 0;
+        function main() {
+          if (!canvasRef.current) return;
+          // const obj2world = Transform.translate(0, 0, -15).multi(Transform.rotateX((deg++ / 180) * Math.PI));
+          // cubePrimitive.shape.obj2world = obj2world;
+          // cubePrimitive.shape.world2Obj = obj2world.inverse();
+          render(canvasRef.current, scene, camera);
+          requestAnimationFrame(main);
+        }
+        main();
       }
 
       testGL();
@@ -200,6 +208,7 @@ function App() {
 
     test3d();
   });
+
 
   return (
     <div className="App">
@@ -217,7 +226,7 @@ function App() {
           Learn React
         </a>
       </header> */}
-      <canvas ref={el => { canvasRef.current = el || undefined; }} width="500px" height="500px" />
+      <canvas id='cv' ref={el => { canvasRef.current = el || undefined; }} width="500px" height="500px" />
     </div>
   );
 }

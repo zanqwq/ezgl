@@ -1,4 +1,4 @@
-const resolution = 2048;
+export const resolution = 2048;
 
 export class FBO {
   frameBuffer: WebGLFramebuffer | null = null;
@@ -26,7 +26,6 @@ export class FBO {
     );
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    (frameBuffer as any).texture = texture;
 
     const depthBuffer = gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);

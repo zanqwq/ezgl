@@ -4,11 +4,18 @@ import { Transform } from "./transform";
 export class Shape {
   obj2world: Transform
   world2Obj: Transform
-  // drawCfg: DrawConfig | undefined;
+
   positions: number[][] = [];
+  positionsBuffer: WebGLBuffer | null = null;
+
   texCoors: number[][] = [];
+  texCoordsBuffer: WebGLBuffer | null = null;
+
   normals: number[][] = [];
+  normalsBuffer: WebGLBuffer | null = null;
+
   indices: number[][] = [];
+  indicesBuffer: WebGLBuffer | null = null;
 
   // getBounding
   // getArea
@@ -17,6 +24,34 @@ export class Shape {
   constructor(obj2world: Transform, world2obj: Transform) {
     this.obj2world = obj2world;
     this.world2Obj = world2obj
+  }
+
+  compiled: boolean = false;
+  compile(canvas: HTMLCanvasElement) {
+    // if (this.compiled) return;
+    // this.compiled = true;
+
+    const gl = canvas.getContext("webgl");
+    if (!gl) return;
+
+    this.positionsBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions.flat()), gl.STATIC_DRAW);
+
+    this.normalsBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.normalsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals.flat()), gl.STATIC_DRAW);
+
+    this.texCoordsBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.normalsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals.flat()), gl.STATIC_DRAW);
+
+    this.indicesBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indicesBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(this.indices.flat()), gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
   }
 }
 

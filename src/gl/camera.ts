@@ -1,4 +1,4 @@
-import { Matrix4x4, Point, Vector } from "./geometry";
+import { Point, Vector } from "./geometry";
 import { Transform } from "./transform";
 
 export class Camera {

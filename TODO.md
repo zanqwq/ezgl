@@ -5,7 +5,7 @@
 5. canvas-producer
 6. rasterization vs ray tracing
 7. only up 3d mobile
-8. 
+8. 台球 game
 
 - [x] phong reflection
 - [x] material, texture map, vedio texture
@@ -15,7 +15,6 @@
 - [x] clinder, cone
 - [x] view space light pos setting
 - [x] 把 vs, fs 写进 material 里, 比如, phong material, glass material ...
-- [ ] look at z rather than -z
 - [ ] shadow map, normal map
 - [ ] optimize performance, 复用 buffer
 - [ ] area light, spot light, hemisphere light

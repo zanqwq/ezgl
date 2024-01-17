@@ -196,8 +196,9 @@ export class Transform {
 
   all inputs are world space
   */
-  static lookAt(pos: Point, tar: Point, up: Vector): Transform {
+  static lookAt(pos: Point, tar: Point, _up: Vector): Transform {
     const translate = Transform.translate(-pos.x, -pos.y, -pos.z);
+    const up = _up.normalized();
 
     const look = tar.sub(pos).normalized();
     const lookCrossUp = Vector.cross(look, up).normalized();
@@ -214,8 +215,9 @@ export class Transform {
   }
 
   static orthoTransform(r: number, l: number, t: number, b: number, n: number, f: number) {
-    return Transform.scale(2 / (r - l), 2 / (t - b), 2 / (n - f))
-      .multi(Transform.translate(-(r + l) / 2, -(t + b) / 2, -(n + f) / 2));
+    const scale = Transform.scale(2 / (r - l), 2 / (t - b), -2 / (n - f));
+    const translate = Transform.translate(-(r + l) / 2, -(t + b) / 2, -(n + f) / 2)
+    return scale.multi(translate);
   }
 
   static perspectTranform(fovY: number, aspectRatio: number, zNear: number, zFar: number) {
@@ -229,9 +231,21 @@ export class Transform {
       [0, 0, n + f, -n * f],
       [0, 0, 1, 0],
     ]);
-    const persp2orthoTransform = new Transform(matPersp2Ortho)
+    const persp2orthoTransform = new Transform(matPersp2Ortho);
 
     return Transform.orthoTransform(r, l, t, b, n, f).multi(persp2orthoTransform);
+
+    // const f = 1 / Math.tan(fovY / 2);
+    // const nf = 1 / (zNear - zFar)
+
+    // const matPersp2Ortho = new Matrix4x4([
+    //   [f / aspectRatio, 0, 0, 0],
+    //   [0, f, 0, 0],
+    //   [0, 0, (zFar + zNear) * nf, 2 * zFar * zNear * nf],
+    //   [0, 0, -1, 0],
+    // ]);
+
+    // return new Transform(matPersp2Ortho);
   }
 
   transformPoint(p: Point) {

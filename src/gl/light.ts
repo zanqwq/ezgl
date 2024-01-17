@@ -1,6 +1,5 @@
 import { FBO } from "./FBO";
-import { Matrix4x4, Point, Vector } from "./geometry";
-import { Primitive } from "./primitive";
+import { Point, Vector } from "./geometry";
 import { Shape } from "./shape";
 import { Transform } from "./transform";
 
@@ -18,7 +17,7 @@ export class DirectionalLight {
   dir: number[];
   up: number[];
   color: number[];
-  fbo: FBO | undefined;
+  fbo: FBO | null = null;
 
   constructor(pos: number[], dir: number[], up: number[], color: number[]) {
     this.pos = pos;
@@ -30,24 +29,30 @@ export class DirectionalLight {
   getLightMVP(shape: Shape) {
     const model = shape.obj2world;
 
-    const p = new Point(this.pos[0], this.pos[1], this.pos[2]);
+    const pos = new Point(this.pos[0], this.pos[1], this.pos[2]);
+    const tar = new Point(
+      this.pos[0] + this.dir[0],
+      this.pos[1] + this.dir[1],
+      this.pos[2] + this.dir[2]
+    );
     const view = Transform.lookAt(
-      p,
-      p.add(new Point(
-        this.pos[0] + this.dir[0],
-        this.pos[1] + this.dir[1],
-        this.pos[2] + this.dir[2]
-      )),
+      pos,
+      tar,
       new Vector(this.up[0], this.up[1], this.up[2])
     );
+    
+    const modelView = view.multi(model);
 
-    const projection = Transform.orthoTransform(5, -5, 5, -5, -5, -1000);
+    const projection = Transform.orthoTransform(100, -100, 100, -100, -1, -500);
 
-    return projection.multi(view.multi(model));
+    const mvp = projection.multi(modelView);
+
+    // console.log(shape.obj2world.m.m, view.m.m, modelView.m.m, projection.m.m, mvp.m.m);
+
+    return mvp;
   }
 
-  setFBO(canvas: HTMLCanvasElement) {
-    if (this.fbo) return;
+  initFBO(canvas: HTMLCanvasElement) {
     this.fbo = new FBO(canvas);
   }
 }
