@@ -37,30 +37,30 @@ scene.primitives = [ spherePrimitive ];
 
 ### Demo
 
-* shapes
+* 形状类
 
-  sphere
+  球体
   ![sphere](./public/sphere.png)
 
-  cone
+  圆锥
   ![cone](./public/cone.png)
 
-  cube
+  立方体
   ![cube](./public/cube.png)
 
-  clinder
+  圆柱体
   ![sphere](./public/clinder.png)
 
-* point light
+* 点光源
 
   ![plight](./public/sphere.png)
   
-* directional light
+* 直线光源
   ![dlight](./public/dLight.png)
-* ambient light
+* 环境光源
 
   ![alight](./public/aLight.png)
 
-* camera movement and real-time shadow
+* 镜头移动和实时阴影
 
   ![sm](./public/sm.gif)
