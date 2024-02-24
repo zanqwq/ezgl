@@ -1,49 +1,66 @@
-# Getting Started with Create React App
+# ezgl
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### Step 1: create a new scene
+```ts
+const scene = new Scene();
+```
 
-## Available Scripts
+### Step 2: create shape
+```ts
+const sphereShape = new Sphere(Transform.translate(0, 0, -10), Transform.translate(0, 0, 10), 5);
 
-In the project directory, you can run:
+```
 
-### `npm start`
+### Step 3: create material and set texture
+```ts
+const sphereMat = new PhongMaterial();
+// set texture by color or url
+// sphereMat.map.color = [1, 0, 0]; red
+sphereMat.map.url = '/wood.jpg';
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Step 4: create primitive by shape and material
+```ts
+const spherePrimitive = new Primitive(sphereShape, sphereMat);
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Step 5: add primitives into the scene
+```ts
+scene.primitives = [ spherePrimitive ];
+```
 
-### `npm test`
+### Step 6: set lights for the scene
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Step 5: add camera
 
-### `npm run build`
+### Step 6: start to render
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Demo
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+* shapes
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+  sphere
+  ![sphere](./public/sphere.png)
 
-### `npm run eject`
+  cone
+  ![cone](./public/cone.png)
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+  cube
+  ![cube](./public/cube.png)
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+  clinder
+  ![sphere](./public/clinder.png)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+* point light
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+  ![plight](./public/sphere.png)
+  
+* directional light
+  ![dlight](./public/dLight.png)
+* ambient light
 
-## Learn More
+  ![alight](./public/aLight.png)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+* camera movement and real-time shadow
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-## NOTE
-If you are developing under WSL, you should create the project under WSL file system rather than windows or other original platform, otherwise hot module reload will not be able to recognize file change in other system.
+  ![sm](./public/sm.gif)

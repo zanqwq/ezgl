@@ -87,6 +87,12 @@ export class Vector {
     return new Vector(this.x * k, this.y * k, this.z * k);
   }
 
+  cross(t: Vector): Vector {
+    const { x: a1, y: a2, z: a3 } = this;
+    const { x: b1, y: b2, z: b3 } = t;
+    return new Vector(a2*b3 - a3*b2, a3*b1 - a1*b3, a1*b2 - a2*b1);
+  }
+
   reverse() {
     return new Vector(-this.x, -this.y, -this.z);
   }

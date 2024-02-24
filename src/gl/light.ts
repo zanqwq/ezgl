@@ -26,7 +26,7 @@ export class DirectionalLight {
     this.color = color;
   }
 
-  getLightMVP(shape: Shape) {
+  getLightMVP(shape: Shape, r = 100, t = 100, n = -1, f = -500) {
     const model = shape.obj2world;
 
     const pos = new Point(this.pos[0], this.pos[1], this.pos[2]);
@@ -43,11 +43,9 @@ export class DirectionalLight {
     
     const modelView = view.multi(model);
 
-    const projection = Transform.orthoTransform(100, -100, 100, -100, -1, -500);
+    const projection = Transform.orthoTransform(r, -r, t, -t, n, f);
 
     const mvp = projection.multi(modelView);
-
-    // console.log(shape.obj2world.m.m, view.m.m, modelView.m.m, projection.m.m, mvp.m.m);
 
     return mvp;
   }

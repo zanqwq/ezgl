@@ -1,6 +1,5 @@
 import { Matrix4x4, Point, Ray, Vector } from "./geometry";
 
-
 export class Transform {
   m: Matrix4x4;
   // for quick inverse
@@ -163,7 +162,7 @@ export class Transform {
     const ttt = new Matrix4x4([
       [0, -za, ya, 0],
       [za, 0, -xa, 0],
-      [-ya, 0, xa, 0],
+      [-ya, xa, 0, 0],
       [0, 0, 0, 1],
     ]).multiScalar(sinT);
 
@@ -215,8 +214,9 @@ export class Transform {
   }
 
   static orthoTransform(r: number, l: number, t: number, b: number, n: number, f: number) {
+    // z 反转一下, 方便后面 gl depth test 算法用 LEARNEST, z 越小的通过测试
     const scale = Transform.scale(2 / (r - l), 2 / (t - b), -2 / (n - f));
-    const translate = Transform.translate(-(r + l) / 2, -(t + b) / 2, -(n + f) / 2)
+    const translate = Transform.translate(-(r + l) / 2, -(t + b) / 2, -(n + f) / 2);
     return scale.multi(translate);
   }
 
@@ -234,18 +234,6 @@ export class Transform {
     const persp2orthoTransform = new Transform(matPersp2Ortho);
 
     return Transform.orthoTransform(r, l, t, b, n, f).multi(persp2orthoTransform);
-
-    // const f = 1 / Math.tan(fovY / 2);
-    // const nf = 1 / (zNear - zFar)
-
-    // const matPersp2Ortho = new Matrix4x4([
-    //   [f / aspectRatio, 0, 0, 0],
-    //   [0, f, 0, 0],
-    //   [0, 0, (zFar + zNear) * nf, 2 * zFar * zNear * nf],
-    //   [0, 0, -1, 0],
-    // ]);
-
-    // return new Transform(matPersp2Ortho);
   }
 
   transformPoint(p: Point) {
@@ -257,10 +245,12 @@ export class Transform {
     if (w === 1) return res;
     return res.multiScalar(1 / w);
   }
-  transformVector(v: Vector) {
+  transformVector(v: Vector, db = false) {
+    db && console.log('tv', this.m.m, v);
     const x = this.m.m[0][0] * v.x + this.m.m[0][1] * v.y + this.m.m[0][2] * v.z;
     const y = this.m.m[1][0] * v.x + this.m.m[1][1] * v.y + this.m.m[1][2] * v.z;
     const z = this.m.m[2][0] * v.x + this.m.m[2][1] * v.y + this.m.m[2][2] * v.z;
+    db && console.log('result', x, y, z);
     return new Vector(x, y, z);
   }
 

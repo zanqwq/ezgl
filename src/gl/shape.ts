@@ -28,8 +28,8 @@ export class Shape {
 
   compiled: boolean = false;
   compile(canvas: HTMLCanvasElement) {
-    // if (this.compiled) return;
-    // this.compiled = true;
+    if (this.compiled) return;
+    this.compiled = true;
 
     const gl = canvas.getContext("webgl");
     if (!gl) return;
@@ -43,8 +43,8 @@ export class Shape {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals.flat()), gl.STATIC_DRAW);
 
     this.texCoordsBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.normalsBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.normals.flat()), gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.texCoors.flat()), gl.STATIC_DRAW);
 
     this.indicesBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indicesBuffer);
@@ -148,8 +148,8 @@ export class Cube extends Shape {
 
 // pane 不能完全薄, 不然法线不好处理
 export class Pane extends Cube {
-  constructor(o2w: Transform, w2o: Transform, w: number, h: number) {
-    super(o2w, w2o, w, h, 0.1);
+  constructor(o2w: Transform, w2o: Transform, a: number, c: number) {
+    super(o2w, w2o, a, 0.1, c);
   }
 }
 

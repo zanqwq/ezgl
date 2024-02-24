@@ -4,7 +4,6 @@ import { Texture } from "./texture";
 import { FBO, resolution } from "./FBO";
 import { DirLightShadowMaterial } from "./material";
 import { ProgramInfo } from "../types";
-import { Pane } from "./shape";
 
 export type DrawConfig = {
   // uniform is available for both vs and fs
@@ -30,7 +29,7 @@ const init = (canvas: HTMLCanvasElement) => {
   gl.depthFunc(gl.LEQUAL);
 }
 
-export function draw(canvas: HTMLCanvasElement, programInfo: ProgramInfo | null, shouldInit = false) {
+export function draw(canvas: HTMLCanvasElement, programInfo: ProgramInfo | null) {
   if (!programInfo) return;
 
   const gl = canvas.getContext("webgl");
@@ -44,10 +43,6 @@ export function draw(canvas: HTMLCanvasElement, programInfo: ProgramInfo | null,
   } else {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
-  }
-
-  if (shouldInit) {
-    init(canvas);
   }
 
   programInfo.attributes.forEach(attr => {
@@ -81,7 +76,7 @@ export function render(canvas: HTMLCanvasElement, scene: Scene, camera: Camera) 
     light.initFBO(canvas);
     for (const primitive of scene.primitives) {
       const dirLightShadowMaterial = new DirLightShadowMaterial();
-      dirLightShadowMaterial.compile(canvas, primitive.shape, light);
+      dirLightShadowMaterial.compile(canvas, primitive.shape, light, camera);
       draw(canvas, dirLightShadowMaterial.programInfo);
     }
   }
@@ -89,9 +84,6 @@ export function render(canvas: HTMLCanvasElement, scene: Scene, camera: Camera) 
   // frame buffer object: consist of color attachment(texture), depth attachment + stencil attachment(render buffer)
   for (const primitive of scene.primitives) {
     primitive.material.compile(canvas, primitive.shape, scene, camera);
-    // draw(canvas, primitive.material.programInfo);
-    if (primitive.shape instanceof Pane) {
-      draw(canvas, primitive.material.programInfo);
-    }
+    draw(canvas, primitive.material.programInfo);
   }
 }

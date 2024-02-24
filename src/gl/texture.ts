@@ -10,8 +10,8 @@ export class Texture {
   compiled = false;
 
   compile(canvas: HTMLCanvasElement) {
-    // if (this.compiled) return;
-    // this.compiled = true;
+    if (this.compiled) return;
+    this.compiled = true;
 
     const gl = canvas.getContext('webgl');
     if (!gl) return;

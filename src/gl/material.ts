@@ -10,7 +10,7 @@ import { Transform } from "./transform";
 export interface IMaterial {
   map: Texture;
   programInfo: ProgramInfo | null;
-  compiled: boolean;
+  // compiled: boolean;
   compile: (
     canvas: HTMLCanvasElement,
     shape: Shape,
@@ -36,6 +36,21 @@ enum BxDFType {
 
 // matte(磨砂 or 哑光) material, plastic material, glass, metal, mirror, ...
 
+const addShader = (canvas: HTMLCanvasElement, program: WebGLProgram, type: 'vs' | 'fs', source: string) => {
+  const gl = canvas.getContext('webgl');
+  if (!gl) return;
+  // init shader
+  const shader = gl.createShader(type === 'vs' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER);
+  if (!shader) return;
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    console.error('shader compile failed');
+    alert(gl.getShaderInfoLog(shader))
+  }
+  gl.attachShader(program, shader);
+};
+
 const initProgram = (canvas: HTMLCanvasElement, vs: string, fs: string) => {
     const gl = canvas.getContext('webgl');
     if (!gl) return;
@@ -43,20 +58,8 @@ const initProgram = (canvas: HTMLCanvasElement, vs: string, fs: string) => {
     const program = gl.createProgram();
     if (!program) return null;
 
-    const addShader = (type: 'vs' | 'fs', source: string) => {
-      // init shader
-      const shader = gl.createShader(type === 'vs' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER);
-      if (!shader) return;
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('shader compile failed');
-        alert(gl.getShaderInfoLog(shader))
-      }
-      gl.attachShader(program, shader);
-    };
-    addShader('vs', vs);
-    addShader('fs', fs);
+    addShader(canvas, program, 'vs', vs);
+    addShader(canvas, program, 'fs', fs);
 
     // link util all shaders attached
     gl.linkProgram(program);
@@ -66,13 +69,14 @@ const initProgram = (canvas: HTMLCanvasElement, vs: string, fs: string) => {
     }
 
     return program;
-}
+};
 
 const phongVsTemplate = `
-uniform mat4 uMatModelView;
+uniform mat4 uMatModel;
+uniform mat4 uMatView;
 uniform mat4 uMatProjection;
 uniform mat4 uMatNormal;
-uniform mat4 uMatLightMvp;
+uniform mat4 uMatLightMvps[NUM_DIR_LIGHTS > 0 ? NUM_DIR_LIGHTS : 1];
 
 attribute vec3 aPos;
 attribute vec3 aNor;
@@ -81,21 +85,33 @@ attribute vec2 aTex;
 varying vec3 vPos;
 varying vec3 vNor;
 varying vec2 vTex;
-varying vec3 vPosFromLight;
+varying vec3 vPosFromLights[NUM_DIR_LIGHTS > 0 ? NUM_DIR_LIGHTS : 1];
 
 void main() {
-  gl_Position = uMatProjection * uMatModelView * vec4(aPos, 1);
-  gl_Position = gl_Position / gl_Position.w;
+  gl_Position = uMatProjection * uMatView * uMatModel *
+                vec4(aPos, 1);
+  // FIX: 提前做 ndc 可能会导致 vPosFromLight 有点问题, 算出来的中线透视有问题
+  // gl_Position /= gl_Position.w;
 
-  vPos = vec3(gl_Position.x, gl_Position.y, gl_Position.z);
-  // 注意, normalize 时 w 值也会影响 normalize, 所以应该用 vec3 做 normalize
+  // 稍微处理下, 不要出现负的 w 值, 不然有些点本来在范围内但却没法显示
+  if (gl_Position.w < 0.0) {
+    gl_Position /= -1.0;
+  }
+
+  vPos = gl_Position.xyz / gl_Position.w;
+
   vec4 t = uMatNormal * vec4(aNor, 1);
+  t /= t.w;
+  // 注意, normalize 时 w 值也会影响 normalize, 所以应该用 vec3 做 normalize
   vNor = normalize(t.xyz);
+
   vTex = aTex;
 
-  vec4 tt = uMatLightMvp * vec4(aPos, 1);
-  tt /= tt.w;
-  vPosFromLight = tt.xyz;
+  for (int i = 0; i < NUM_DIR_LIGHTS; i++) {
+    vec4 t = uMatLightMvps[i] * vec4(aPos, 1);
+    t /= t.w;
+    vPosFromLights[i] = t.xyz;
+  }
 }
 `;
 
@@ -108,6 +124,7 @@ const phongFsTemplate = `
   precision highp float;
 #endif
 
+uniform mat4 uMatView;
 uniform mat4 uMatProjection;
 uniform vec3 uAmbientLights[NUM_AMB_LIGHTS > 0 ? NUM_AMB_LIGHTS : 1];
 uniform struct DirectionalLight {
@@ -126,7 +143,7 @@ uniform sampler2D uShadowMaps[NUM_DIR_LIGHTS > 0 ? NUM_DIR_LIGHTS : 1];
 varying vec3 vPos;
 varying vec3 vNor;
 varying vec2 vTex;
-varying vec3 vPosFromLight;
+varying vec3 vPosFromLights[NUM_DIR_LIGHTS > 0 ? NUM_DIR_LIGHTS : 1];
 
 float useShadowMap(sampler2D shadowMap, vec3 shadowCoord) {
   float depth = texture2D(shadowMap, shadowCoord.xy).z;
@@ -142,8 +159,6 @@ void main() {
   vec4 t = texture2D(uMap, vTex);
   vec3 texColor = t.xyz;
   vec3 kd = texColor;
-
-  vec3 shadowCoord = (vPosFromLight + 1.0) / 2.0; 
 
   // 计算 pling-phong 反射模型 ambient + diffuse + specular
   vec3 color = vec3(0, 0, 0);
@@ -164,6 +179,8 @@ void main() {
     vec3 diffuse = kd * light_intensity * max(dot(vNor, light_dir), 0.0);
     vec3 specular = ks * light_intensity * pow(max(0.0, dot(vNor, normalize(light_dir + eye_dir))), p);
 
+    vec3 shadowCoord = (vPosFromLights[i] + 1.0) / 2.0;
+
     float visibility = useShadowMap(uShadowMaps[i], shadowCoord);
 
     color += (diffuse + specular) * visibility;
@@ -174,17 +191,21 @@ void main() {
     // 假设点光源在 r = 1 处能量为 I, 则总能量为 I * 4pi
     // 则在 r 处的能量为 I * 4pi / r^2 * 4pi
     // 即 I / r^2
-    vec4 t = uMatProjection * vec4(uPointLights[i].pos, 1);
+    vec4 t = uMatProjection * uMatView * vec4(uPointLights[i].pos, 1);
     t /= t.w;
-    vec3 lightPos = vec3(t.x, t.y, t.z);
+    vec3 lightPos = t.xyz;
     vec3 lightColor = uPointLights[i].color;
 
     float rSquare = pow(length(lightPos - vPos), 2.0);
     vec3 light_intensity = lightColor / (rSquare < 1.0 ? 1.0 : rSquare);
     light_intensity = lightColor;
     vec3 light_dir = normalize(lightPos - vPos);
+    light_dir = (light_dir + 1.0) / 2.0;
+    // gl_FragColor = vec4(light_dir, 1.0);
+    // return;
 
-    vec3 diffuse = kd * light_intensity * max(dot(vNor, light_dir), 0.0);
+    // vec3 diffuse = kd * light_intensity * max(dot(vNor, light_dir), 0.0);
+    vec3 diffuse = kd * light_intensity * dot(vNor, light_dir);
     vec3 specular = ks * light_intensity * pow(max(0.0, dot(vNor, normalize(light_dir + eye_dir))), p);
 
     color += diffuse + specular;
@@ -197,6 +218,7 @@ void main() {
 export class PhongMaterial implements IMaterial {
   // 普通贴图, 作为 kd 项
   map = new Texture();
+  // 法线贴图
   normalMap?: Texture;
   // 凹凸贴图
   bumpMap?: Texture;
@@ -204,7 +226,7 @@ export class PhongMaterial implements IMaterial {
   displacementMap?: Texture;
 
   programInfo: ProgramInfo | null = null;
-  compiled = false;
+  // compiled = false;
   compile(canvas: HTMLCanvasElement, shape: Shape, scene: Scene, camera: Camera) {
     // if (this.compiled) return;
     // this.compiled = true;
@@ -223,17 +245,19 @@ export class PhongMaterial implements IMaterial {
     );
     */
 
-    const modelViewTransform = camera.viewTranform.multi(shape.obj2world);
-    const uMatModelView = modelViewTransform.transpose().m.m;
+    const modelTransform = shape.obj2world;
+    const { viewTransform, clipTransform } = camera;
 
-    const clipTransform = camera.clipTransform;
-    const uMatProjection = clipTransform.transpose().m.m;
+    const uMatModel = modelTransform.transpose().m.m.flat();
+    const uMatView = viewTransform.transpose().m.m.flat();
+    const uMatProjection = clipTransform.transpose().m.m.flat();
 
     // 法线不用经过 clipTransform
-    // FIX: 法线方向变了, 光照方向没变, 不应该加上 view transform, 要么就得把光线方向也 transform 了
-    const transform = shape.obj2world;
-    const uMatNormal = Transform.normalTransform(transform).transpose().m.m;
+    // FIX: 法线方向变了, 光照方向没变, 不应该加上 view transform ? 要么就得把光线方向也 transform 了
+    const transform = camera.viewTransform.multi(shape.obj2world);
+    const uMatNormal = Transform.normalTransform(transform).transpose().m.m.flat();
 
+    // TODO:
     const orthoTransform = camera.orthoTransform;
     const eyePosPoint = orthoTransform.transformPoint(new Point(0, 0, 0));
     const uEyePos = [eyePosPoint.x, eyePosPoint.y, eyePosPoint.z];
@@ -264,21 +288,6 @@ export class PhongMaterial implements IMaterial {
     const gl = canvas.getContext('webgl');
     if (!gl) return;
 
-    const addShader = (type: 'vs' | 'fs', source: string) => {
-      // init shader
-      const shader = gl.createShader(type === 'vs' ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER);
-      if (!shader) return;
-      gl.shaderSource(shader, source);
-      gl.compileShader(shader);
-      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('shader compile failed');
-        alert(gl.getShaderInfoLog(shader))
-      }
-      gl.attachShader(program, shader);
-    };
-    addShader('vs', vsSource);
-    addShader('fs', fsSource);
-
     // link util all shaders attached
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
@@ -308,17 +317,25 @@ export class PhongMaterial implements IMaterial {
       {
         type: 'Matrix4fv',
         args: [
-          gl.getUniformLocation(program, 'uMatModelView'),
+          gl.getUniformLocation(program, 'uMatModel'),
           false,
-          uMatModelView.flat(),
-        ]
+          uMatModel,
+        ],
+      },
+      {
+        type: 'Matrix4fv',
+        args: [
+          gl.getUniformLocation(program, 'uMatView'),
+          false,
+          uMatView,
+        ],
       },
       {
         type: 'Matrix4fv',
         args: [
           gl.getUniformLocation(program, 'uMatProjection'),
           false,
-          uMatProjection.flat(),
+          uMatProjection,
         ],
       },
       {
@@ -326,7 +343,7 @@ export class PhongMaterial implements IMaterial {
         args: [
           gl.getUniformLocation(program, 'uMatNormal'),
           false,
-          uMatNormal.flat(),
+          uMatNormal,
         ],
       },
       {
@@ -371,7 +388,7 @@ export class PhongMaterial implements IMaterial {
         {
           type: 'Matrix4fv',
           args: [
-            gl.getUniformLocation(program, 'uMatLightMvp'),
+            gl.getUniformLocation(program, `uMatLightMvps[${idx}]`),
             false,
             light.getLightMVP(shape).transpose().m.m.flat(),
           ]
@@ -427,16 +444,13 @@ uniform mat4 uMatLightMvp;
 
 void main() {
   gl_Position = uMatLightMvp * vec4(aPos, 1);
-  gl_Position /= gl_Position.w; // ndc space
+  if (gl_Position.w < 0.0) {
+    gl_Position /= -1.0;
+  }
 }
 `;
 const dirLightSmFsTemplate = `
 void main() {
-  if (gl_FragCoord.x > 1024.0) {
-    gl_FragColor = vec4(gl_FragCoord.x / 2048.0, 0, 0, 1);
-  } else {
-    gl_FragColor = vec4(0, 0, gl_FragCoord.z, 1);
-  }
   gl_FragColor = vec4(0, 0, gl_FragCoord.z, 1);
 }
 `;
@@ -444,7 +458,7 @@ void main() {
 export class DirLightShadowMaterial {
   programInfo: ProgramInfo | null = null;
 
-  compile(canvas: HTMLCanvasElement, shape: Shape, light: DirectionalLight) {
+  compile(canvas: HTMLCanvasElement, shape: Shape, light: DirectionalLight, camera: Camera) {
     const program = initProgram(canvas, dirLightSmVsTemplate, dirLightSmFsTemplate);
     if (!program) return;
 

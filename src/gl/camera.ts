@@ -7,9 +7,13 @@ export class Camera {
   zNear: number;
   zFar: number;
 
-  viewTranform: Transform;
+  viewTransform: Transform;
   orthoTransform: Transform;
   clipTransform: Transform;
+
+  pos: Point = new Point(0, 0, 0);
+  tar: Point = new Point(0, 0, -1);
+  up: Vector = new Vector(0, 1, 0);
 
   constructor(fovY: number, aspectRatio: number, zNear: number, zFar: number) {
     this.fovY = fovY;
@@ -23,20 +27,60 @@ export class Camera {
     const r = t / aspectRatio, l = -r;
 
     // transform to [-1, 1]^3 canonical cube
-    // const matOrtho = new Matrix4x4([
-    //   [2 / (r - l), 0, 0, -(r + l) / 2],
-    //   [0, 2 / (t - b), 0, -(t + b) / 2],
-    //   [0, 0, 2 / (n - f), -(n + f) / 2],
-    //   [0, 0, 0, 1],
-    // ]);
     this.orthoTransform = Transform.orthoTransform(r, l, t, b, n, f);
 
     this.clipTransform = Transform.perspectTranform(fovY, aspectRatio, zNear, zFar);
 
-    this.viewTranform = Transform.lookAt(new Point(0, 0, 0), new Point(0, 0, -1), new Vector(0, 1, 0));
+    this.viewTransform = Transform.lookAt(this.pos, this.tar, this.up);
+
+      let w = 0;
+      let d = 0;
+      window.addEventListener('keydown', e => {
+        let { pos, tar, up } = this;
+        let { x, y, z } = pos;
+        const lookDir = tar.sub(pos).normalized();
+        const crossDir = lookDir.cross(up).normalized();
+        // x^2 + y^2 + z^2 = 1
+        // (wx)^2 + (wy)^2 + (wz)^2 = w^2
+        if (e.key === 'w') {
+          w = 1;
+        } else if (e.key === 's') {
+          w = -1;
+        }
+        x += lookDir.x * w;
+        y += lookDir.y * w;
+        z += lookDir.z * w;
+
+        if (e.key === 'd') {
+          d = 1;
+        } else if (e.key === 'a') {
+          d = -1;
+        }
+        x += crossDir.x * d;
+        y += crossDir.y * d;
+        z += crossDir.z * d;
+
+        pos.x = x;
+        pos.y = y;
+        pos.z = z;
+        tar = pos.addVec(lookDir);
+        this.lookAt(pos, tar, up);
+      });
+
+      window.addEventListener('keyup', e => {
+        if (e.key === 'w' || e.key === 's') {
+          w = 0;
+        }
+        if (e.key === 'a' || e.key === 'd') {
+          d = 0;
+        }
+      });
   }
 
   lookAt(pos: Point, tar: Point, up: Vector) {
-    this.viewTranform = Transform.lookAt(pos, tar, up);
+    this.pos = pos;
+    this.tar = tar;
+    this.up = up;
+    this.viewTransform = Transform.lookAt(pos, tar, up);
   }
 }
